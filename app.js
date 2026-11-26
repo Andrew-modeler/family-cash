@@ -377,6 +377,39 @@ function updateMainButton() {
   if (!onMain) return;
 }
 
+/* ---------- анимация сохранения ---------- */
+let busyStart = 0;
+function startBusy(mode) {
+  const box = $('busy'), coins = $('coins');
+  coins.replaceChildren();
+  for (let i = 0; i < 7; i++) {
+    const c = document.createElement('img');
+    c.className = 'coin';
+    c.src = 'coin.png';
+    c.alt = '';
+    const side = i % 2 ? 1 : -1;
+    c.style.setProperty('--dx', (side * (25 + Math.random() * 75)).toFixed(0) + 'px');
+    c.style.setProperty('--r', (side * (90 + Math.random() * 270)).toFixed(0) + 'deg');
+    c.style.setProperty('--d', (i * 0.16).toFixed(2) + 's');
+    coins.appendChild(c);
+  }
+  box.classList.toggle('income', mode === 'income');
+  box.classList.remove('out');
+  $('busy-text').textContent = mode === 'income' ? 'Кладу в кошелёк…' : 'Записываю…';
+  box.hidden = false;
+  busyStart = Date.now();
+}
+async function stopBusy() {
+  const box = $('busy');
+  if (box.hidden) return;
+  const left = 1100 - (Date.now() - busyStart);          // анимацию видно хотя бы ~1 с
+  if (left > 0) await new Promise((r) => setTimeout(r, left));
+  box.classList.add('out');
+  await new Promise((r) => setTimeout(r, 240));
+  box.hidden = true;
+  box.classList.remove('out');
+}
+
 async function save() {
   if (state.busy || !(amountNum() > 0)) return;
   state.busy = true;
@@ -384,6 +417,7 @@ async function save() {
   $('desc').blur();
   updateMainButton();
   haptic();
+  startBusy(state.mode);
   try {
     const d = await api({ action: state.mode === 'income' ? 'income' : 'add', amount: state.amount, cat: state.cat, desc: $('desc').value.trim(), day: state.day, reqId: state.reqId });
     if (!d.ok) throw new Error(d.error || 'server');
@@ -391,8 +425,10 @@ async function save() {
     saveCache(d);
     state.lastAdded = d.added;
     state.reqId = null;
+    await stopBusy();
     showDone(d);
   } catch (e) {
+    await stopBusy();
     haptic('err');
     toast(errText(e && e.message), true);   // reqId сохраняется: повтор не создаст дубль
   } finally {
