@@ -175,3 +175,6 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 /* пока подтягиваются свежие остатки — цифры чуть бледнее */
 body.stale .balance { opacity: .75; transition: opacity .3s; }
 .balance { transition: opacity .3s; }
+/* пока пишут «Что купили?» — кнопка не липнет к клавиатуре и не закрывает поле */
+body.typing .btn-save { position: static; box-shadow: none; }
+body.typing .recent { display: none; }
