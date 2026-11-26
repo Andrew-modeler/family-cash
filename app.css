@@ -232,3 +232,8 @@ body.typing .form { height: auto; min-height: 0; }
 body.income .desc { display: none; }
 body.income .seg { flex: 1; }
 body.income .seg-btn { flex: 1; padding: 9px 0; }
+/* форма не меньше окна, но может стать выше — тогда ничего не наезжает на кнопку */
+.form { height: auto; min-height: calc(var(--tg-viewport-stable-height, 100vh) - 24px - var(--safe-b)); }
+.form > :not(.keypad) { flex-shrink: 0; }
+.recent { margin-top: 22px; }
+.form { min-height: calc(var(--app-h, 100vh) - 24px - var(--safe-b)); }

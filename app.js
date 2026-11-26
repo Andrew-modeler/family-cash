@@ -490,6 +490,14 @@ function demoApi(b) {
   }, 500));
 }
 
+/* высота экрана: меньшее из того, что сообщает Telegram, и реального окна (не во время набора текста) */
+function fitHeight() {
+  if (document.body.classList.contains('typing')) return;
+  const tgH = tg && initData && tg.viewportStableHeight ? tg.viewportStableHeight : Infinity;
+  const h = Math.min(window.innerHeight, tgH);
+  if (h > 300 && isFinite(h)) document.documentElement.style.setProperty('--app-h', h + 'px');
+}
+
 /* ---------- старт ---------- */
 (function start() {
   if (tg && initData) {
@@ -499,6 +507,9 @@ function demoApi(b) {
     try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) { /* старый клиент */ }
   }
   bind();
+  fitHeight();
+  window.addEventListener('resize', fitHeight);
+  if (tg && initData && tg.onEvent) tg.onEvent('viewportChanged', (e) => { if (!e || e.isStateStable) fitHeight(); });
   if (!initData && !DEMO) return show('scr-outside');
   load();
 })();
