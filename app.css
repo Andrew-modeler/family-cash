@@ -178,3 +178,13 @@ body.stale .balance { opacity: .75; transition: opacity .3s; }
 /* пока пишут «Что купили?» — кнопка не липнет к клавиатуре и не закрывает поле */
 body.typing .btn-save, body.typing .keypad, body.typing .recent { display: none; }
 body.typing .row-extra { margin-bottom: 40vh; }   /* место под клавиатуру, поле остаётся видно */
+/* Расход / Приход */
+.mode { display: inline-flex; background: var(--card); border-radius: 12px; padding: 3px; gap: 2px; }
+.mode-btn { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 650; padding: 5px 14px; border-radius: 9px; }
+.mode-btn.on { background: var(--accent); color: var(--accent-text); }
+body.income .mode-btn.on { background: var(--ok); color: #fff; }
+body.income .amount:not(.empty) { color: var(--ok); }
+body.income .btn-save { background: var(--ok); box-shadow: 0 8px 20px color-mix(in srgb, var(--ok) 30%, transparent); }
+body.income .cats { display: none; }
+.income-note { background: var(--card); border-radius: 14px; padding: 10px 12px; font-size: 13.5px; line-height: 1.35; color: var(--muted); margin: 4px 0 10px; }
+.income-note b { color: var(--text); }

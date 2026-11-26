@@ -28,7 +28,7 @@ const DEMO = new URLSearchParams(location.search).has('demo');
 const initData = tg && tg.initData ? tg.initData : '';
 
 const $ = (id) => document.getElementById(id);
-const state = { amount: '', cat: 'Продукты', day: 'today', data: null, busy: false, reqId: null, lastAdded: null };
+const state = { mode: 'spend', amount: '', cat: 'Продукты', day: 'today', data: null, busy: false, reqId: null, lastAdded: null };
 
 /* ---------- сервер ---------- */
 async function api(body) {
@@ -255,6 +255,19 @@ function renderRecent() {
   });
 }
 
+function setMode(m) {
+  state.mode = m;
+  document.body.classList.toggle('income', m === 'income');
+  document.querySelectorAll('.mode-btn').forEach((b) => {
+    const on = b.dataset.mode === m;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  $('income-note').hidden = m !== 'income';
+  $('desc').placeholder = m === 'income' ? 'Откуда деньги?' : 'Что купили?';
+  renderAmount();
+}
+
 /* сумма: цифры, одна запятая, 2 знака после, без ведущих нулей */
 function press(k) {
   let a = state.amount;
@@ -285,7 +298,10 @@ function renderAmount() {
   const hint = $('amount-hint');
   hint.classList.remove('warn');
   hint.textContent = '';
-  if (n > 0 && state.data) {
+  if (n > 0 && state.data && state.mode === 'income') {
+    hint.textContent = 'Наличных станет ' + fmt((state.data.cashNum || 0) + n) + ' ₾';
+    if (n >= 2000) { hint.textContent = 'Крупная сумма — проверьте, нет ли лишнего нуля'; hint.classList.add('warn'); }
+  } else if (n > 0 && state.data) {
     const left = (state.data.cashNum || 0) - n;
     if (n >= 500) { hint.textContent = 'Крупная сумма — проверьте, нет ли лишнего нуля'; hint.classList.add('warn'); }
     else if (left < 0) { hint.textContent = 'По таблице наличных ' + state.data.cash + ' — можно записать, Андрей сверит'; hint.classList.add('warn'); }
@@ -295,6 +311,7 @@ function renderAmount() {
 }
 
 function saveLabel() {
+  if (state.mode === 'income') return 'Добавить приход ' + (state.amount || '0') + ' ₾';
   const [e, label] = CAT_META[state.cat] || ['', state.cat];
   return 'Записать ' + (state.amount || '0') + ' ₾ · ' + label;
 }
@@ -320,7 +337,7 @@ async function save() {
   updateMainButton();
   haptic();
   try {
-    const d = await api({ action: 'add', amount: state.amount, cat: state.cat, desc: $('desc').value.trim(), day: state.day, reqId: state.reqId });
+    const d = await api({ action: state.mode === 'income' ? 'income' : 'add', amount: state.amount, cat: state.cat, desc: $('desc').value.trim(), day: state.day, reqId: state.reqId });
     if (!d.ok) throw new Error(d.error || 'server');
     state.data = d;
     saveCache(d);
@@ -338,6 +355,15 @@ async function save() {
 
 function showDone(d) {
   const a = d.added;
+  if (a.kind === 'income') {
+    $('done-title').textContent = 'Приход ' + fmt(a.amount) + ' ₾';
+    $('done-text').textContent = '💵 ' + a.desc + (state.day === 'yesterday' ? ' · вчера' : '');
+    $('done-cash').textContent = '👛 Наличных стало ' + d.cash;
+    $('done-undo').hidden = false;
+    show('scr-done');
+    haptic('ok');
+    return;
+  }
   const [e, label] = CAT_META[a.cat] || ['✨', a.cat];
   $('done-title').textContent = 'Записано ' + fmt(a.amount) + ' ₾';
   $('done-text').textContent = e + ' ' + (a.desc && a.desc !== a.cat ? a.desc + ' · ' : '') + label +
@@ -352,6 +378,7 @@ function resetForm() {
   state.amount = '';
   state.day = 'today';
   state.cat = 'Продукты';
+  setMode('spend');
   $('desc').value = '';
   document.querySelectorAll('.seg-btn').forEach((b) => {
     const on = b.dataset.day === 'today';
@@ -366,7 +393,7 @@ async function undo() {
   state.busy = true;
   $('done-undo').disabled = true;
   try {
-    const d = await api({ action: 'undo', row: state.lastAdded.row });
+    const d = await api({ action: 'undo', row: state.lastAdded.row, kind: state.lastAdded.kind || 'spend' });
     if (!d.ok) throw new Error(d.error);
     state.data = d;
     saveCache(d);
@@ -406,6 +433,7 @@ function bind() {
   });
   $('desc').addEventListener('blur', () => { document.body.classList.remove('typing'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('save').addEventListener('click', save);
+  document.querySelectorAll('.mode-btn').forEach((b) => b.addEventListener('click', () => { haptic('tap'); setMode(b.dataset.mode); }));
   $('sheet-back').addEventListener('click', closeSheet);
   $('err-retry').addEventListener('click', load);
   $('done-more').addEventListener('click', () => { resetForm(); show('scr-main'); });
@@ -435,6 +463,15 @@ function demoApi(b) {
   return new Promise((ok) => setTimeout(() => {
     if (b.action === 'state') return ok(demo.reg ? demoState() : { ok: true, registered: false, canJoin: true, names: ['Андрей', 'Юлия'] });
     if (b.action === 'register') { demo.reg = true; return ok(demoState()); }
+    if (b.action === 'income') {
+      if (demo.seen[b.reqId]) { const s1 = demoState(); s1.added = demo.seen[b.reqId]; return ok(s1); }
+      const amount = Number(String(b.amount).replace(',', '.'));
+      demo.cash = Math.round((demo.cash + amount) * 100) / 100;
+      const added = { kind: 'income', row: 5, amount, desc: b.desc || 'Приход наличных', date: '26.11.2026' };
+      demo.seen[b.reqId] = added; demo.lastIncome = amount;
+      const s = demoState(); s.added = added; return ok(s);
+    }
+    if (b.action === 'undo' && b.kind === 'income') { demo.cash = Math.round((demo.cash - (demo.lastIncome || 0)) * 100) / 100; return ok(demoState()); }
     if (b.action === 'add') {
       if (demo.seen[b.reqId]) { const s0 = demoState(); s0.added = demo.seen[b.reqId]; return ok(s0); }
       const amount = Number(String(b.amount).replace(',', '.'));
