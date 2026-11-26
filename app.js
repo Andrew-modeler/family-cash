@@ -455,7 +455,10 @@ function showDone(d) {
     $('done-title').textContent = 'Приход ' + fmt(a.amount) + ' ₾';
     $('done-text').textContent = '💵 ' + a.desc + (state.day === 'yesterday' ? ' · вчера' : '');
     $('done-cash').textContent = '👛 Наличных стало ' + d.cash;
-    $('done-undo').hidden = false;
+    $('done-undo').hidden = true;          // после прихода — только «ОК»
+    $('done-more').hidden = true;
+    $('done-close').textContent = 'ОК';
+    $('done-close').className = 'btn btn-primary';
     show('scr-done');
     haptic('ok');
     return;
@@ -465,6 +468,9 @@ function showDone(d) {
   $('done-text').textContent = e + ' ' + (a.desc && a.desc !== a.cat ? a.desc + ' · ' : '') + label +
     (state.day === 'yesterday' ? ' · вчера' : '');
   $('done-cash').textContent = '👛 Наличных осталось ' + d.cash;
+  $('done-more').hidden = false;
+  $('done-close').textContent = 'Готово';
+  $('done-close').className = 'btn btn-ghost';
   renderJoke();
   $('done-undo').hidden = false;
   show('scr-done');
