@@ -379,7 +379,7 @@ function updateMainButton() {
 
 /* ---------- анимация сохранения ---------- */
 let busyStart = 0;
-function startBusy(mode) {
+function startBusy(mode, text) {
   const box = $('busy'), coins = $('coins');
   coins.replaceChildren();
   for (let i = 0; i < 7; i++) {
@@ -395,7 +395,7 @@ function startBusy(mode) {
   }
   box.classList.toggle('income', mode === 'income');
   box.classList.remove('out');
-  $('busy-text').textContent = mode === 'income' ? 'Кладу в кошелёк…' : 'Записываю…';
+  $('busy-text').textContent = text || (mode === 'income' ? 'Кладу в кошелёк…' : 'Записываю…');
   box.hidden = false;
   busyStart = Date.now();
 }
@@ -538,16 +538,23 @@ async function undo() {
   if (!state.lastAdded || state.busy) return;
   state.busy = true;
   $('done-undo').disabled = true;
+  haptic();
+  // наоборот: отмена расхода — монеты возвращаются в кошелёк, отмена прихода — вылетают из него
+  startBusy(state.lastAdded.kind === 'income' ? 'spend' : 'income', 'Отменяю…');
   try {
     const d = await api({ action: 'undo', row: state.lastAdded.row, kind: state.lastAdded.kind || 'spend' });
     if (!d.ok) throw new Error(d.error);
     state.data = d;
     saveCache(d);
     state.lastAdded = null;
+    await stopBusy();
     resetForm();
     show('scr-main');
-    toast('Запись отменена');
+    haptic('ok');
+    toast('Запись отменена ✓');
   } catch (e) {
+    await stopBusy();
+    haptic('err');
     toast(errText(e && e.message), true);
   } finally {
     state.busy = false;
