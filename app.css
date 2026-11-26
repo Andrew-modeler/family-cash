@@ -237,3 +237,5 @@ body.income .seg-btn { flex: 1; padding: 9px 0; }
 .form > :not(.keypad) { flex-shrink: 0; }
 .recent { margin-top: 22px; }
 .form { min-height: calc(var(--app-h, 100vh) - 24px - var(--safe-b)); }
+.income-note .note-warm { color: var(--text); font-weight: 600; }
+.income-note .note-warm + div:not(.note-warm) { margin-top: 4px; }

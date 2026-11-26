@@ -255,6 +255,21 @@ function renderRecent() {
   });
 }
 
+/* текст в режиме «Приход»: Юлии — тёплый, Андрею — только про банкомат */
+function renderIncomeNote() {
+  const box = $('income-note');
+  const atm = 'Снятие в банкомате можно не вносить — оно уже само записано по SMS.';
+  const lines = (state.data && state.data.name === 'Юлия')
+    ? ['💜 Спасибо, что бережёшь наш бюджет 💜', 'Тебя очень любят и ценят)', atm]
+    : [atm];
+  box.replaceChildren(...lines.map((t, i) => {
+    const d = document.createElement('div');
+    d.textContent = t;
+    if (lines.length > 1 && i < 2) d.className = 'note-warm';
+    return d;
+  }));
+}
+
 function setMode(m) {
   state.mode = m;
   document.body.classList.toggle('income', m === 'income');
@@ -264,6 +279,7 @@ function setMode(m) {
     b.setAttribute('aria-checked', String(on));
   });
   $('income-note').hidden = m !== 'income';
+  if (m === 'income') renderIncomeNote();
   if (m === 'income') $('desc').value = '';   // у прихода описания нет
   renderAmount();
 }
