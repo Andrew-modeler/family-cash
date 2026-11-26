@@ -498,7 +498,7 @@ function showDone(d) {
     $('done-title').textContent = 'Приход ' + fmt(a.amount) + ' ₾';
     $('done-text').textContent = '💵 ' + a.desc + (state.day === 'yesterday' ? ' · вчера' : '');
     $('done-cash').textContent = '👛 Наличных стало ' + d.cash;
-    $('done-undo').hidden = true;          // после прихода — только «ОК»
+    $('done-undo').hidden = false;         // после прихода — «ОК» и отмена ошибочной записи
     $('done-more').hidden = true;
     $('done-close').textContent = 'ОК';
     $('done-close').className = 'btn btn-primary';
