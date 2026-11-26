@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://telegram.org; style-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Наличные</title>
+<link rel="stylesheet" href="app.css?v=9">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="app.js?v=9" defer></script>
+</head>
+<body>
+
+<!-- Загрузка -->
+<section id="scr-loading" class="screen center">
+  <div class="spinner" aria-hidden="true"></div>
+  <p class="muted">Загружаю…</p>
+</section>
+
+<!-- Открыто не из Telegram -->
+<section id="scr-outside" class="screen center" hidden>
+  <div class="big-emoji" aria-hidden="true">📱</div>
+  <h1>Откройте в Telegram</h1>
+  <p class="muted">Эта страница работает только внутри Telegram — по ссылке, которую прислал Андрей.</p>
+</section>
+
+<!-- Ошибка -->
+<section id="scr-error" class="screen center" hidden>
+  <div class="big-emoji" aria-hidden="true">😕</div>
+  <h1 id="err-title">Не получилось загрузить</h1>
+  <p class="muted" id="err-text">Проверьте интернет и попробуйте ещё раз.</p>
+  <button class="btn btn-primary" id="err-retry" type="button">Попробовать ещё раз</button>
+</section>
+
+<!-- Первый вход -->
+<section id="scr-join" class="screen center" hidden>
+  <div class="big-emoji" aria-hidden="true">👋</div>
+  <h1>Привет! Кто вы?</h1>
+  <p class="muted">Это нужно один раз — чтобы в таблице было видно, кто записал.</p>
+  <div class="join-buttons" id="join-buttons"></div>
+</section>
+
+<!-- Нет приглашения -->
+<section id="scr-noinvite" class="screen center" hidden>
+  <div class="big-emoji" aria-hidden="true">🔒</div>
+  <h1>Нужна ссылка-приглашение</h1>
+  <p class="muted">Попросите Андрея прислать ссылку и откройте приложение по ней.</p>
+</section>
+
+<!-- Главный экран -->
+<section id="scr-main" class="screen" hidden>
+  <header class="balance">
+    <div class="bal-day-label">📅 Можно тратить в день</div>
+    <div class="bal-day" id="bal-perday">—</div>
+    <div class="bal-cols">
+      <div class="bal-col"><div class="bal-col-label">👛 Наличные</div><div class="bal-col-value" id="bal-cash">—</div></div>
+      <div class="bal-col"><div class="bal-col-label">💳 Карта</div><div class="bal-col-value" id="bal-card">—</div></div>
+    </div>
+  </header>
+
+  <div class="amount-wrap">
+    <div class="amount-label">Сколько потратили наличными?</div>
+    <div class="amount" id="amount" aria-live="polite"><span id="amount-text">0</span><span class="cur">₾</span></div>
+    <div class="hint" id="amount-hint"></div>
+  </div>
+
+  <div class="cats" id="cats" role="radiogroup" aria-label="Категория"></div>
+
+  <div class="row-extra">
+    <input id="desc" class="desc" type="text" maxlength="80" placeholder="Что купили?" autocomplete="off" enterkeyhint="done">
+    <div class="seg" role="radiogroup" aria-label="День">
+      <button type="button" class="seg-btn on" data-day="today" role="radio" aria-checked="true">Сегодня</button>
+      <button type="button" class="seg-btn" data-day="yesterday" role="radio" aria-checked="false">Вчера</button>
+    </div>
+  </div>
+
+  <div class="keypad" id="keypad">
+    <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+    <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+    <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+    <button type="button" data-k=",">,</button><button type="button" data-k="0">0</button><button type="button" data-k="del" aria-label="Стереть">⌫</button>
+  </div>
+
+  <button class="btn btn-primary btn-save" id="save" type="button" disabled>Введите сумму</button>
+
+  <section class="recent" id="recent-wrap" hidden>
+    <h2>Последние наличные</h2>
+    <ul id="recent"></ul>
+  </section>
+</section>
+
+<!-- Все категории -->
+<div class="sheet-back" id="sheet-back" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-label="Все категории">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <h2>Категория</h2>
+  <div class="sheet-cats" id="sheet-cats"></div>
+</div>
+
+<!-- Записано -->
+<section id="scr-done" class="screen center" hidden>
+  <div class="check" aria-hidden="true"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg></div>
+  <h1 id="done-title">Записано</h1>
+  <p class="muted" id="done-text"></p>
+  <div class="done-cash" id="done-cash"></div>
+  <div class="done-buttons">
+    <button class="btn btn-primary" id="done-more" type="button">Ещё трата</button>
+    <button class="btn btn-ghost" id="done-close" type="button">Готово</button>
+  </div>
+  <button class="btn-link" id="done-undo" type="button">Ошибка в записи? Отменить</button>
+</section>
+
+<div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

@@ -1,0 +1,431 @@
+'use strict';
+/* Семейные траты — мини-приложение Telegram «Наличные».
+ * Данные идут в Apps Script таблицы; подпись Telegram проверяет сервер. Демо без Telegram: ?demo=1 */
+
+// Адрес скрипта таблицы не хранится в репозитории: приходит в ссылке мини-приложения (?api=<id развёртывания>)
+const API_ID = (new URLSearchParams(location.search).get('api') || '').trim();
+const API = /^[A-Za-z0-9_-]{20,120}$/.test(API_ID) ? 'https://script.google.com/macros/s/' + API_ID + '/exec' : '';
+
+const CAT_META = {
+  'Продукты': ['🛒', 'Продукты'], 'Кафе и рестораны': ['☕', 'Кафе'], 'Транспорт и такси': ['🚕', 'Такси'],
+  'Дом и быт': ['🏠', 'Дом'], 'Здоровье и аптека': ['💊', 'Аптека'], 'Красота': ['💅', 'Красота'],
+  'Одежда и обувь': ['👗', 'Одежда'], 'Подарки': ['🎁', 'Подарки'], 'Развлечения и отдых': ['🎉', 'Отдых'],
+  'Подписки и связь': ['📱', 'Связь'], 'ЖКХ': ['💡', 'ЖКХ'], 'Аренда': ['🔑', 'Аренда'],
+  'Рассрочка': ['📆', 'Рассрочка'], 'Налоги': ['🧾', 'Налоги'], 'Переводы': ['💸', 'Переводы'], 'Другое': ['✨', 'Другое']
+};
+// базовый порядок; поверх него — частота трат из таблицы (catRank с сервера)
+const BASE_CATS = ['Продукты', 'Кафе и рестораны', 'Здоровье и аптека', 'Транспорт и такси', 'Дом и быт', 'Одежда и обувь', 'Другое'];
+function topCats() {
+  const rank = (state.data && state.data.catRank) || [];
+  const out = [];
+  const NOT_CASH = ['Подписки и связь', 'Рассрочка', 'Налоги'];   // наличными не платят — в «Ещё»
+  rank.concat(BASE_CATS).forEach((c) => { if (CAT_META[c] && NOT_CASH.indexOf(c) < 0 && out.indexOf(c) < 0 && out.length < 7) out.push(c); });
+  return out;
+}
+
+const tg = window.Telegram && window.Telegram.WebApp;
+const DEMO = new URLSearchParams(location.search).has('demo');
+const initData = tg && tg.initData ? tg.initData : '';
+
+const $ = (id) => document.getElementById(id);
+const state = { amount: '', cat: 'Продукты', day: 'today', data: null, busy: false, reqId: null, lastAdded: null };
+
+/* ---------- сервер ---------- */
+async function api(body) {
+  if (DEMO) return demoApi(body);
+  if (!API) throw new Error('no_api');
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // простой запрос, без preflight
+    body: JSON.stringify(Object.assign({ initData }, body)),
+    redirect: 'follow'
+  });
+  if (!res.ok) throw new Error('http_' + res.status);
+  return res.json();
+}
+
+/* ---------- экраны ---------- */
+function show(id) {
+  document.querySelectorAll('.screen').forEach((s) => { s.hidden = s.id !== id; });
+  updateMainButton();
+}
+
+function haptic(kind) {
+  try {
+    if (!tg || !tg.HapticFeedback) return;
+    if (kind === 'tap') tg.HapticFeedback.selectionChanged();
+    else if (kind === 'ok') tg.HapticFeedback.notificationOccurred('success');
+    else if (kind === 'err') tg.HapticFeedback.notificationOccurred('error');
+    else tg.HapticFeedback.impactOccurred('light');
+  } catch (e) { /* старый клиент */ }
+}
+
+let toastTimer;
+function toast(text, isErr) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.toggle('err', !!isErr);
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 3200);
+}
+
+const ERRORS = {
+  bad_auth: 'Не удалось проверить вход. Закройте и откройте приложение заново.',
+  old_auth: 'Сессия устарела. Закройте и откройте приложение заново.',
+  no_token: 'Бот ещё не настроен. Напишите Андрею.',
+  no_invite: 'Нужна ссылка-приглашение от Андрея.',
+  full: 'Уже подключено максимум людей.',
+  bad_amount: 'Проверьте сумму.',
+  no_api: 'Ссылка на приложение неполная. Напишите Андрею.',
+  undo_expired: 'Отменить уже нельзя — прошло больше 10 минут. Напишите Андрею.'
+};
+function errText(e) { return ERRORS[e] || 'Нет связи с таблицей. Проверьте интернет и нажмите ещё раз.'; }
+
+/* ---------- загрузка ---------- */
+async function load() {
+  show('scr-loading');
+  try {
+    const d = await api({ action: 'state' });
+    if (!d.ok) return fail(errText(d.error));
+    if (!d.registered) return d.canJoin ? showJoin(d.names) : show('scr-noinvite');
+    state.data = d;
+    renderMain();
+    show('scr-main');
+  } catch (e) {
+    fail(errText(e && e.message));
+  }
+}
+
+function fail(text) {
+  $('err-text').textContent = text;
+  show('scr-error');
+}
+
+function showJoin(names) {
+  const box = $('join-buttons');
+  box.replaceChildren();
+  names.forEach((n) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-primary';
+    b.textContent = n;
+    b.addEventListener('click', () => join(n, b));
+    box.appendChild(b);
+  });
+  show('scr-join');
+}
+
+async function join(name, btn) {
+  btn.disabled = true;
+  haptic('tap');
+  // разрешить боту писать (остатки и уведомления); отказ не мешает вносить траты
+  if (tg && tg.requestWriteAccess) {
+    try { await new Promise((ok) => tg.requestWriteAccess(() => ok())); } catch (e) { /* нет поддержки */ }
+  }
+  try {
+    const d = await api({ action: 'register', name });
+    if (!d.ok) { btn.disabled = false; return toast(errText(d.error), true); }
+    state.data = d;
+    renderMain();
+    show('scr-main');
+    toast('Готово! Теперь можно вносить наличные 👛');
+  } catch (e) {
+    btn.disabled = false;
+    toast(errText(), true);
+  }
+}
+
+/* ---------- главный экран ---------- */
+function renderMain() {
+  const d = state.data;
+  $('bal-cash').textContent = d.cash;
+  $('bal-perday').textContent = d.perDay;
+  $('bal-card').textContent = d.card;
+  renderCats();
+  renderRecent();
+  renderAmount();
+}
+
+function catButton(cat, cls) {
+  const [e, label] = CAT_META[cat] || ['✨', cat];
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = cls + (cat === state.cat ? ' on' : '');
+  b.setAttribute('role', 'radio');
+  b.setAttribute('aria-checked', String(cat === state.cat));
+  const em = document.createElement('span'); em.className = 'e'; em.textContent = e;
+  const tx = document.createElement('span'); tx.textContent = label;
+  b.append(em, tx);
+  return b;
+}
+
+function renderCats() {
+  const box = $('cats');
+  box.replaceChildren();
+  // 7 частых + выбранная редкая (если не из частых) + «Ещё»
+  const list = topCats();
+  if (list.indexOf(state.cat) < 0) list[list.length - 1] = state.cat;
+  list.forEach((c) => {
+    const b = catButton(c, 'cat');
+    b.addEventListener('click', () => pickCat(c));
+    box.appendChild(b);
+  });
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'cat';
+  const em = document.createElement('span'); em.className = 'e'; em.textContent = '•••';
+  const tx = document.createElement('span'); tx.textContent = 'Ещё';
+  more.append(em, tx);
+  more.addEventListener('click', openSheet);
+  box.appendChild(more);
+}
+
+function pickCat(c) {
+  state.cat = c;
+  haptic('tap');
+  renderCats();
+  updateMainButton();
+}
+
+function openSheet() {
+  haptic('tap');
+  const box = $('sheet-cats');
+  box.replaceChildren();
+  ((state.data && state.data.cats) || Object.keys(CAT_META)).forEach((c) => {
+    const b = catButton(c, 'cat');
+    b.addEventListener('click', () => { pickCat(c); closeSheet(); });
+    box.appendChild(b);
+  });
+  $('sheet').hidden = false;
+  $('sheet-back').hidden = false;
+  if (tg && tg.BackButton) tg.BackButton.show();
+}
+function closeSheet() {
+  $('sheet').hidden = true;
+  $('sheet-back').hidden = true;
+  if (tg && tg.BackButton) tg.BackButton.hide();
+}
+
+function renderRecent() {
+  const list = (state.data && state.data.recent) || [];
+  $('recent-wrap').hidden = list.length === 0;
+  const ul = $('recent');
+  ul.replaceChildren();
+  list.forEach((r) => {
+    const li = document.createElement('li');
+    const main = document.createElement('div'); main.className = 'r-main';
+    const desc = document.createElement('div'); desc.className = 'r-desc';
+    desc.textContent = ((CAT_META[r.cat] || ['✨'])[0]) + ' ' + (r.desc || r.cat);
+    const meta = document.createElement('div'); meta.className = 'r-meta';
+    meta.textContent = r.date.slice(0, 5) + ' · ' + r.who;
+    main.append(desc, meta);
+    const sum = document.createElement('div'); sum.className = 'r-sum'; sum.textContent = r.sum;
+    li.append(main, sum);
+    ul.appendChild(li);
+  });
+}
+
+/* сумма: цифры, одна запятая, 2 знака после, без ведущих нулей */
+function press(k) {
+  let a = state.amount;
+  if (k === 'del') a = a.slice(0, -1);
+  else if (k === ',') { if (a.indexOf(',') >= 0) return bump(); a = (a || '0') + ','; }
+  else {
+    if (a.indexOf(',') >= 0 && a.split(',')[1].length >= 2) return bump();
+    if (a.replace(',', '').length >= 7) return bump();
+    a = (a === '0') ? k : a + k;
+  }
+  state.amount = a;
+  haptic('tap');
+  renderAmount();
+}
+function bump() {
+  haptic('err');
+  const el = $('amount');
+  el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+}
+
+function amountNum() { return Number((state.amount || '0').replace(',', '.')); }
+function fmt(n) { const r = Math.round(n * 100) / 100; return (Number.isInteger(r) ? String(r) : r.toFixed(2)).replace('.', ','); }
+
+function renderAmount() {
+  const n = amountNum();
+  $('amount-text').textContent = state.amount || '0';
+  $('amount').classList.toggle('empty', !state.amount);
+  const hint = $('amount-hint');
+  hint.classList.remove('warn');
+  hint.textContent = '';
+  if (n > 0 && state.data) {
+    const left = (state.data.cashNum || 0) - n;
+    if (n >= 500) { hint.textContent = 'Крупная сумма — проверьте, нет ли лишнего нуля'; hint.classList.add('warn'); }
+    else if (left < 0) { hint.textContent = 'По таблице наличных ' + state.data.cash + ' — можно записать, Андрей сверит'; hint.classList.add('warn'); }
+    else hint.textContent = 'Останется ' + fmt(left) + ' ₾';
+  }
+  updateMainButton();
+}
+
+function saveLabel() {
+  const [e, label] = CAT_META[state.cat] || ['', state.cat];
+  return 'Записать ' + (state.amount || '0') + ' ₾ · ' + label;
+}
+
+/* Сохранение: одна кнопка на странице (и нативная Telegram — если доступна) */
+function updateMainButton() {
+  const onMain = !$('scr-main').hidden && $('sheet').hidden;
+  const ready = amountNum() > 0 && !state.busy;
+  const btn = $('save');
+  btn.disabled = !ready;
+  btn.textContent = state.busy ? 'Записываю…' : (amountNum() > 0 ? saveLabel() : 'Введите сумму');
+  if (!tg || !tg.MainButton || DEMO) return;
+  // нативная кнопка Telegram дублирует нашу — прячем её, чтобы не было двух кнопок
+  tg.MainButton.hide();
+  if (!onMain) return;
+}
+
+async function save() {
+  if (state.busy || !(amountNum() > 0)) return;
+  state.busy = true;
+  if (!state.reqId) state.reqId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  $('desc').blur();
+  updateMainButton();
+  haptic();
+  try {
+    const d = await api({ action: 'add', amount: state.amount, cat: state.cat, desc: $('desc').value.trim(), day: state.day, reqId: state.reqId });
+    if (!d.ok) throw new Error(d.error || 'server');
+    state.data = d;
+    state.lastAdded = d.added;
+    state.reqId = null;
+    showDone(d);
+  } catch (e) {
+    haptic('err');
+    toast(errText(e && e.message), true);   // reqId сохраняется: повтор не создаст дубль
+  } finally {
+    state.busy = false;
+    updateMainButton();
+  }
+}
+
+function showDone(d) {
+  const a = d.added;
+  const [e, label] = CAT_META[a.cat] || ['✨', a.cat];
+  $('done-title').textContent = 'Записано ' + fmt(a.amount) + ' ₾';
+  $('done-text').textContent = e + ' ' + (a.desc && a.desc !== a.cat ? a.desc + ' · ' : '') + label +
+    (state.day === 'yesterday' ? ' · вчера' : '');
+  $('done-cash').textContent = '👛 Наличных осталось ' + d.cash;
+  $('done-undo').hidden = false;
+  show('scr-done');
+  haptic('ok');
+}
+
+function resetForm() {
+  state.amount = '';
+  state.day = 'today';
+  state.cat = 'Продукты';
+  $('desc').value = '';
+  document.querySelectorAll('.seg-btn').forEach((b) => {
+    const on = b.dataset.day === 'today';
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  renderMain();
+}
+
+async function undo() {
+  if (!state.lastAdded || state.busy) return;
+  state.busy = true;
+  $('done-undo').disabled = true;
+  try {
+    const d = await api({ action: 'undo', row: state.lastAdded.row });
+    if (!d.ok) throw new Error(d.error);
+    state.data = d;
+    state.lastAdded = null;
+    resetForm();
+    show('scr-main');
+    toast('Запись отменена');
+  } catch (e) {
+    toast(errText(e && e.message), true);
+  } finally {
+    state.busy = false;
+    $('done-undo').disabled = false;
+    updateMainButton();
+  }
+}
+
+/* ---------- события ---------- */
+function bind() {
+  $('amount').addEventListener('click', () => { if (!state.amount) { toast('Наберите сумму на кнопках ниже 👇'); bump(); } });
+  $('keypad').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (b) press(b.dataset.k);
+  });
+  document.querySelectorAll('.seg-btn').forEach((b) => b.addEventListener('click', () => {
+    state.day = b.dataset.day;
+    document.querySelectorAll('.seg-btn').forEach((x) => {
+      const on = x === b;
+      x.classList.toggle('on', on);
+      x.setAttribute('aria-checked', String(on));
+    });
+    haptic('tap');
+  }));
+  $('desc').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ev.target.blur(); });
+  $('save').addEventListener('click', save);
+  $('sheet-back').addEventListener('click', closeSheet);
+  $('err-retry').addEventListener('click', load);
+  $('done-more').addEventListener('click', () => { resetForm(); show('scr-main'); });
+  $('done-close').addEventListener('click', () => { if (tg && tg.close && !DEMO) tg.close(); else { resetForm(); show('scr-main'); } });
+  $('done-undo').addEventListener('click', undo);
+  if (tg && tg.BackButton) tg.BackButton.onClick(closeSheet);
+  // физическая клавиатура (на компьютере)
+  document.addEventListener('keydown', (ev) => {
+    if (document.activeElement === $('desc') || $('scr-main').hidden) return;
+    if (/^[0-9]$/.test(ev.key)) press(ev.key);
+    else if (ev.key === ',' || ev.key === '.') press(',');
+    else if (ev.key === 'Backspace') press('del');
+    else if (ev.key === 'Enter') save();
+  });
+}
+
+/* ---------- демо без Telegram (?demo=1) ---------- */
+const demo = { cash: 14, rows: [
+  { row: 28, date: '26.11.2026', sum: '7,00 ₾', cat: 'Другое', desc: 'шоколадка', who: 'Юлия' },
+  { row: 26, date: '25.11.2026', sum: '46,00 ₾', cat: 'Продукты', desc: 'Рынок', who: 'Юлия' }
+], reg: false, next: 29, seen: {} };
+function demoState() {
+  return { ok: true, registered: true, name: 'Юлия', cats: Object.keys(CAT_META),
+    catRank: ['Продукты', 'Другое', 'Кафе и рестораны', 'Подписки и связь', 'Одежда и обувь'], cash: fmt(demo.cash) + ' ₾', cashNum: demo.cash, card: '81,88 ₾', perDay: '6,71 ₾', reserve: '123,30 $', recent: demo.rows.slice(0, 5) };
+}
+function demoApi(b) {
+  return new Promise((ok) => setTimeout(() => {
+    if (b.action === 'state') return ok(demo.reg ? demoState() : { ok: true, registered: false, canJoin: true, names: ['Андрей', 'Юлия'] });
+    if (b.action === 'register') { demo.reg = true; return ok(demoState()); }
+    if (b.action === 'add') {
+      if (demo.seen[b.reqId]) { const s0 = demoState(); s0.added = demo.seen[b.reqId]; return ok(s0); }
+      const amount = Number(String(b.amount).replace(',', '.'));
+      demo.cash = Math.round((demo.cash - amount) * 100) / 100;
+      const added = { row: demo.next++, amount, cat: b.cat, desc: b.desc || b.cat, date: '26.11.2026' };
+      demo.rows.unshift({ row: added.row, date: added.date, sum: fmt(amount) + ' ₾', cat: b.cat, desc: added.desc, who: 'Юлия' });
+      demo.seen[b.reqId] = added;
+      const s = demoState(); s.added = added; return ok(s);
+    }
+    if (b.action === 'undo') {
+      const i = demo.rows.findIndex((r) => r.row === b.row);
+      if (i >= 0) { demo.cash += Number(demo.rows[i].sum.replace(/[^\d,]/g, '').replace(',', '.')); demo.rows.splice(i, 1); }
+      return ok(demoState());
+    }
+    ok({ ok: false, error: 'unknown' });
+  }, 500));
+}
+
+/* ---------- старт ---------- */
+(function start() {
+  if (tg && initData) {
+    tg.ready();
+    tg.expand();
+    document.documentElement.classList.add('tg');
+    try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) { /* старый клиент */ }
+  }
+  bind();
+  if (!initData && !DEMO) return show('scr-outside');
+  load();
+})();
