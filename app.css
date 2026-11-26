@@ -239,3 +239,12 @@ body.income .seg-btn { flex: 1; padding: 9px 0; }
 .form { min-height: calc(var(--app-h, 100vh) - 24px - var(--safe-b)); }
 .income-note .note-warm { color: var(--text); font-weight: 600; }
 .income-note .note-warm + div:not(.note-warm) { margin-top: 4px; }
+
+/* шутка-награда на экране «Записано» */
+.done-joke {
+  max-width: 340px; margin: -6px 0 18px; padding: 12px 16px; border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  animation: fade .4s .35s both;
+}
+.done-joke .joke-1 { font-weight: 650; }
+.done-joke .joke-2 { color: var(--muted); margin-top: 2px; }
