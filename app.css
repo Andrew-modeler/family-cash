@@ -248,3 +248,4 @@ body.income .seg-btn { flex: 1; padding: 9px 0; }
 }
 .done-joke .joke-1 { font-weight: 650; }
 .done-joke .joke-2 { color: var(--muted); margin-top: 2px; }
+.recent .r-inc { color: var(--ok); }

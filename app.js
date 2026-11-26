@@ -245,11 +245,11 @@ function renderRecent() {
     const li = document.createElement('li');
     const main = document.createElement('div'); main.className = 'r-main';
     const desc = document.createElement('div'); desc.className = 'r-desc';
-    desc.textContent = ((CAT_META[r.cat] || ['✨'])[0]) + ' ' + (r.desc || r.cat);
+    desc.textContent = (r.inc ? '💵' : ((CAT_META[r.cat] || ['✨'])[0])) + ' ' + (r.desc || r.cat);
     const meta = document.createElement('div'); meta.className = 'r-meta';
     meta.textContent = r.date.slice(0, 5) + ' · ' + r.who;
     main.append(desc, meta);
-    const sum = document.createElement('div'); sum.className = 'r-sum'; sum.textContent = r.sum;
+    const sum = document.createElement('div'); sum.className = 'r-sum' + (r.inc ? ' r-inc' : ''); sum.textContent = (r.inc ? '+' : '') + r.sum;
     li.append(main, sum);
     ul.appendChild(li);
   });
