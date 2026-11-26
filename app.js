@@ -83,18 +83,46 @@ const ERRORS = {
 function errText(e) { return ERRORS[e] || 'Нет связи с таблицей. Проверьте интернет и нажмите ещё раз.'; }
 
 /* ---------- загрузка ---------- */
+/* Последние остатки хранятся на телефоне: экран показывается сразу, свежие данные — в фоне */
+const CACHE_KEY = 'state_v1';
+function saveCache(d) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) { /* нет места */ } }
+function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) { return null; } }
+
 async function load() {
-  show('scr-loading');
-  try {
-    const d = await api({ action: 'state' });
-    if (!d.ok) return fail(errText(d.error));
-    if (!d.registered) return d.canJoin ? showJoin(d.names) : show('scr-noinvite');
-    state.data = d;
+  const cached = DEMO ? null : readCache();
+  if (cached && cached.registered) {
+    state.data = cached;
     renderMain();
     show('scr-main');
-  } catch (e) {
-    fail(errText(e && e.message));
+    document.body.classList.add('stale');
+  } else {
+    show('scr-loading');
   }
+  try {
+    const d = await api({ action: 'state' });
+    if (!d.ok) { if (!cached) fail(errText(d.error)); else toast(errText(d.error), true); return; }
+    if (!d.registered) { localStorage.removeItem(CACHE_KEY); return d.canJoin ? showJoin(d.names) : show('scr-noinvite'); }
+    state.data = d;
+    saveCache(d);
+    if ($('scr-main').hidden) { renderMain(); show('scr-main'); }
+    else refreshMain();
+  } catch (e) {
+    if (cached) toast('Нет связи — показаны последние остатки', true);
+    else fail(errText(e && e.message));
+  } finally {
+    document.body.classList.remove('stale');
+  }
+}
+
+/* обновить цифры, не сбивая набранную сумму и выбранную категорию */
+function refreshMain() {
+  const d = state.data;
+  $('bal-cash').textContent = d.cash;
+  $('bal-perday').textContent = d.perDay;
+  $('bal-card').textContent = d.card;
+  renderCats();
+  renderRecent();
+  renderAmount();
 }
 
 function fail(text) {
@@ -127,6 +155,7 @@ async function join(name, btn) {
     const d = await api({ action: 'register', name });
     if (!d.ok) { btn.disabled = false; return toast(errText(d.error), true); }
     state.data = d;
+    saveCache(d);
     renderMain();
     show('scr-main');
     toast('Готово! Теперь можно вносить наличные 👛');
@@ -294,6 +323,7 @@ async function save() {
     const d = await api({ action: 'add', amount: state.amount, cat: state.cat, desc: $('desc').value.trim(), day: state.day, reqId: state.reqId });
     if (!d.ok) throw new Error(d.error || 'server');
     state.data = d;
+    saveCache(d);
     state.lastAdded = d.added;
     state.reqId = null;
     showDone(d);
@@ -339,6 +369,7 @@ async function undo() {
     const d = await api({ action: 'undo', row: state.lastAdded.row });
     if (!d.ok) throw new Error(d.error);
     state.data = d;
+    saveCache(d);
     state.lastAdded = null;
     resetForm();
     show('scr-main');

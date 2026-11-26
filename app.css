@@ -172,3 +172,6 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 .bal-col-label { font-size: 12px; opacity: .9; }
 .bal-col-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 @media (max-height: 780px) { .bal-day { font-size: 26px; } .bal-cols { margin-top: 6px; } .bal-col { padding: 4px 8px; } }
+/* пока подтягиваются свежие остатки — цифры чуть бледнее */
+body.stale .balance { opacity: .75; transition: opacity .3s; }
+.balance { transition: opacity .3s; }
