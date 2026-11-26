@@ -249,3 +249,37 @@ body.income .seg-btn { flex: 1; padding: 9px 0; }
 .done-joke .joke-1 { font-weight: 650; }
 .done-joke .joke-2 { color: var(--muted); margin-top: 2px; }
 .recent .r-inc { color: var(--ok); }
+
+/* ===== Заставка при загрузке ===== */
+.splash { position: relative; overflow: hidden; gap: 0; }
+.splash-glow {
+  position: absolute; width: 340px; height: 340px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, #2f7cf6 45%, transparent) 0%, color-mix(in srgb, #8b5cf6 25%, transparent) 45%, transparent 70%);
+  filter: blur(10px); animation: glow 3s ease-in-out infinite; top: 50%; left: 50%; transform: translate(-50%, -62%);
+}
+.splash-icon {
+  position: relative; width: 132px; height: 132px; border-radius: 30px; overflow: hidden;
+  box-shadow: 0 18px 40px rgba(60, 60, 200, .35); animation: float 2.4s ease-in-out infinite, pop .5s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.splash-icon img { display: block; width: 100%; height: 100%; }
+.splash-shine {
+  position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.55) 48%, transparent 62%);
+  transform: translateX(-120%); animation: shine 2.4s ease-in-out infinite .6s;
+}
+.splash-title { margin-top: 26px; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; animation: fadeUp .6s .15s both; }
+.splash-dots { display: flex; gap: 7px; margin-top: 14px; animation: fadeUp .6s .3s both; }
+.splash-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: dot 1s ease-in-out infinite; }
+.splash-dots i:nth-child(2) { animation-delay: .15s; }
+.splash-dots i:nth-child(3) { animation-delay: .3s; }
+.splash.out { animation: splashOut .35s ease forwards; }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+@keyframes shine { 0% { transform: translateX(-120%); } 55%, 100% { transform: translateX(120%); } }
+@keyframes glow { 0%, 100% { opacity: .55; transform: translate(-50%, -62%) scale(.92); } 50% { opacity: 1; transform: translate(-50%, -62%) scale(1.05); } }
+@keyframes dot { 0%, 100% { transform: translateY(0); opacity: .4; } 40% { transform: translateY(-7px); opacity: 1; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } }
+@keyframes splashOut { to { opacity: 0; transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) { .splash *, .splash { animation: none !important; } }
+
+.splash-glow { pointer-events: none; }
+#scr-loading { overflow: hidden; max-width: 100vw; }

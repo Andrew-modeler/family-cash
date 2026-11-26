@@ -46,6 +46,13 @@ async function api(body) {
 
 /* ---------- экраны ---------- */
 function show(id) {
+  const splash = $('scr-loading');
+  // заставка уходит плавно, а не пропадает рывком
+  if (id !== 'scr-loading' && !splash.hidden && !splash.classList.contains('out')) {
+    splash.classList.add('out');
+    setTimeout(() => { splash.hidden = true; splash.classList.remove('out'); show(id); }, 330);
+    return;
+  }
   document.querySelectorAll('.screen').forEach((s) => { s.hidden = s.id !== id; });
   updateMainButton();
 }
