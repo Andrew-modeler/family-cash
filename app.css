@@ -176,5 +176,5 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 body.stale .balance { opacity: .75; transition: opacity .3s; }
 .balance { transition: opacity .3s; }
 /* пока пишут «Что купили?» — кнопка не липнет к клавиатуре и не закрывает поле */
-body.typing .btn-save { position: static; box-shadow: none; }
-body.typing .recent { display: none; }
+body.typing .btn-save, body.typing .keypad, body.typing .recent { display: none; }
+body.typing .row-extra { margin-bottom: 40vh; }   /* место под клавиатуру, поле остаётся видно */

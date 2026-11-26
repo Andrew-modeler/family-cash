@@ -402,9 +402,9 @@ function bind() {
   $('desc').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ev.target.blur(); });
   $('desc').addEventListener('focus', () => {
     document.body.classList.add('typing');
-    setTimeout(() => $('desc').scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);   // после появления клавиатуры
+    setTimeout(() => $('desc').scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);   // после появления клавиатуры
   });
-  $('desc').addEventListener('blur', () => { document.body.classList.remove('typing'); });
+  $('desc').addEventListener('blur', () => { document.body.classList.remove('typing'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('save').addEventListener('click', save);
   $('sheet-back').addEventListener('click', closeSheet);
   $('err-retry').addEventListener('click', load);
