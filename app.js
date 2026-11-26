@@ -264,7 +264,7 @@ function setMode(m) {
     b.setAttribute('aria-checked', String(on));
   });
   $('income-note').hidden = m !== 'income';
-  $('desc').placeholder = m === 'income' ? 'Откуда деньги?' : 'Что купили?';
+  if (m === 'income') $('desc').value = '';   // у прихода описания нет
   renderAmount();
 }
 

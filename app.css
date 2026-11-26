@@ -228,3 +228,7 @@ body.income .cats { display: none; }
 /* при вводе описания форма не держит высоту экрана */
 body.typing .form { height: auto; min-height: 0; }
 @media (max-height: 640px) { .income-note { font-size: 12px; padding: 7px 10px; margin: 2px 0 6px; } }
+/* приход: без поля «Откуда», только день */
+body.income .desc { display: none; }
+body.income .seg { flex: 1; }
+body.income .seg-btn { flex: 1; padding: 9px 0; }
