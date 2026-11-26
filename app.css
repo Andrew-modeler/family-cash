@@ -188,3 +188,43 @@ body.income .btn-save { background: var(--ok); box-shadow: 0 8px 20px color-mix(
 body.income .cats { display: none; }
 .income-note { background: var(--card); border-radius: 14px; padding: 10px 12px; font-size: 13.5px; line-height: 1.35; color: var(--muted); margin: 4px 0 10px; }
 .income-note b { color: var(--text); }
+
+/* Один экран: форма ровно по высоте окна Telegram, цифры занимают остаток */
+#scr-main { padding-top: 8px; padding-bottom: 8px; }
+.form {
+  display: flex; flex-direction: column;
+  height: calc(var(--tg-viewport-stable-height, 100vh) - 16px - var(--safe-b));
+  min-height: 520px;
+}
+.form .keypad { flex: 1 1 auto; min-height: 150px; grid-auto-rows: 1fr; }
+.form .keypad button { height: auto; min-height: 34px; }
+.form .btn-save { position: static; margin-top: 8px; flex: 0 0 auto; }
+.form .balance { flex: 0 0 auto; }
+.form .amount-wrap { padding: 6px 0 0; }
+.form .hint { min-height: 18px; font-size: 13px; }
+.form .cats { margin: 4px 0 6px; }
+.form .row-extra { margin-bottom: 6px; }
+.recent { margin-top: 14px; }
+@media (max-height: 760px) {
+  .bal-day { font-size: 24px; }
+  .bal-cols { margin-top: 5px; gap: 6px; }
+  .bal-col { padding: 3px 8px; }
+  .bal-col-value { font-size: 16px; }
+  .amount { font-size: 40px; }
+  .amount .cur { font-size: 24px; }
+  .cat { min-height: 46px; padding: 5px 2px; }
+  .cat .e { font-size: 18px; }
+  .desc { padding: 9px 12px; }
+  .btn-save { padding: 12px 16px; }
+}
+@media (max-height: 640px) {
+  .bal-day-label, .bal-col-label { font-size: 11px; }
+  .bal-day { font-size: 21px; }
+  .amount { font-size: 34px; }
+  .cat { min-height: 40px; font-size: 11px; }
+  .cat .e { font-size: 16px; }
+  .mode-btn { padding: 4px 12px; font-size: 13px; }
+}
+/* при вводе описания форма не держит высоту экрана */
+body.typing .form { height: auto; min-height: 0; }
+@media (max-height: 640px) { .income-note { font-size: 12px; padding: 7px 10px; margin: 2px 0 6px; } }

@@ -10,9 +10,9 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-<link rel="stylesheet" href="app.css?v=13">
+<link rel="stylesheet" href="app.css?v=14">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="app.js?v=13" defer></script>
+<script src="app.js?v=14" defer></script>
 </head>
 <body>
 
@@ -54,6 +54,7 @@
 
 <!-- Главный экран -->
 <section id="scr-main" class="screen" hidden>
+  <div class="form" id="form">
   <header class="balance">
     <div class="bal-day-label">📅 Можно тратить в день</div>
     <div class="bal-day" id="bal-perday">—</div>
@@ -91,6 +92,7 @@
   </div>
 
   <button class="btn btn-primary btn-save" id="save" type="button" disabled>Введите сумму</button>
+  </div>
 
   <section class="recent" id="recent-wrap" hidden>
     <h2>Последние наличные</h2>
